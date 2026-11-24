@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPush
 
 from src.config.path import ASSETS_DIR
 
+from frontend.pyside6.avatar import AvatarLoader, placeholder
 from frontend.pyside6.signals import LogCategory, app_signals
 from frontend.pyside6.theme import get_palette
 
@@ -51,6 +52,8 @@ class HomePage(QWidget):
         self.setObjectName("HomePage")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._entry_buttons = {}
+        self._user = None
+        self._avatar_loader = AvatarLoader(self)
         self._build()
         app_signals.theme_changed.connect(self._on_theme_changed)
         app_signals.login_changed.connect(self._on_login_changed)
@@ -63,11 +66,16 @@ class HomePage(QWidget):
         top = QHBoxLayout()
         top.setContentsMargins(20, 10, 20, 0)
         top.addStretch(1)
-        self.btn_login = QPushButton("登录")
+        # 头像按钮：未登录显示占位头像 + "登录"，已登录显示真实头像 + 昵称。
+        # 点击分流到登录页/个人中心页，与 downkyicore 的 IndexAccountButton 一致。
+        self.btn_login = QPushButton()
         self.btn_login.setObjectName("HomeLogin")
         self.btn_login.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_login.setToolTip("前往登录页")
-        self.btn_login.clicked.connect(lambda: app_signals.goto_page.emit("login"))
+        self.btn_login.setToolTip("登录 / 我的空间")
+        self.btn_login.setIconSize(QSize(32, 32))
+        self.btn_login.setIcon(QIcon(placeholder(32)))
+        self.btn_login.setText("登录")
+        self.btn_login.clicked.connect(self._on_account_clicked)
         top.addWidget(self.btn_login)
         outer.addLayout(top)
 
@@ -146,11 +154,26 @@ class HomePage(QWidget):
     def _on_toolbox(self):
         QMessageBox.information(self, "工具箱", "工具箱功能开发中，敬请期待。")
 
+    def _on_account_clicked(self):
+        """头像点击：未登录去登录页，已登录去个人中心页。"""
+        if self._user is not None and getattr(self._user, "is_login", False):
+            app_signals.goto_page.emit("myspace")
+        else:
+            app_signals.goto_page.emit("login")
+
     def _on_login_changed(self, user):
+        self._user = user
         if user is not None and getattr(user, "is_login", False):
             self.btn_login.setText(user.uname or "已登录")
+            self.btn_login.setToolTip("我的空间")
+            if getattr(user, "face", ""):
+                self._avatar_loader.load(user.face, 32, lambda pm: self.btn_login.setIcon(QIcon(pm)))
+            else:
+                self.btn_login.setIcon(QIcon(placeholder(32)))
         else:
             self.btn_login.setText("登录")
+            self.btn_login.setToolTip("登录 B 站账号")
+            self.btn_login.setIcon(QIcon(placeholder(32)))
 
     def _apply_theme_icons(self):
         color = get_palette()["nav_active"]

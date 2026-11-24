@@ -15,6 +15,9 @@ class UserUrls:
     CARD = f"{API_BASE}/x/web-interface/card"  # 用户卡片信息（粉丝数等）
     CARDS = f"{API_VC_BASE}/account/v1/user/cards"  # 批量用户名片（IM，uids 逗号分隔）
     SPACE_ARC_SEARCH = f"{API_BASE}/x/space/wbi/arc/search"  # 用户空间视频列表（需 wbi 签名）
+    MY_INFO = f"{API_BASE}/x/space/myinfo"  # 当前登录用户的完整资料（需登录，无需 wbi）
+    NAV = f"{API_BASE}/x/web-interface/nav"  # 登录状态/硬币/钱包余额
+    RELATION_STAT = f"{API_BASE}/x/relation/stat"  # 关注/粉丝/黑名单数（参数 vmid）
 
     @staticmethod
     def space_home(mid: int) -> str:

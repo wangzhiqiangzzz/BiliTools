@@ -19,7 +19,8 @@ class AppSignals(QObject):
 
     log_message = Signal(int, str)       # (LogCategory, text)
     login_changed = Signal(object)       # LoginUser | None（未登录/获取失败）
-    goto_page = Signal(str)              # 'home' | 'download' | 'login' | 'settings'
+    goto_page = Signal(str)              # 'home' | 'download' | 'login' | 'settings' | 'myspace'
+    prefill_requested = Signal(str, str)  # (原文, source)：跳下载页后预填输入
     theme_changed = Signal(str)          # 'light' | 'dark'
     zoom_changed = Signal(float)         # 全局界面缩放系数
     save_dir_changed = Signal(str)       # 下载/设置页共享的保存目录

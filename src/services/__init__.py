@@ -17,6 +17,7 @@
 - `live.py`     LiveService：直播间信息 / 最近弹幕 / 实时弹幕监听录制 / 发送弹幕
 - `tts.py`      TtsService：GPT-SoVITS 语音合成客户端（本机 HTTP）
 - `live_speech.py` LiveSpeechService：弹幕 → 过滤 → 队列 → 合成 → 播放
+- `myspace.py`     MySpaceService：个人中心资料 / 余额 / 关系数
 """
 
 from src.services.archive import ArchiveService
@@ -30,6 +31,7 @@ from src.services.live import LiveService
 from src.services.live_speech import LiveSpeechService, SpeechFilter
 from src.services.login import LoginService
 from src.services.message import MessageService
+from src.services.myspace import MySpaceService
 from src.services.rank import RankService
 from src.services.reply import ReplyService
 from src.services.tts import TtsService
@@ -50,6 +52,7 @@ __all__ = [
     "TtsService",
     "LoginService",
     "MessageService",
+    "MySpaceService",
     "RankService",
     "ReplyService",
     "ContractService",

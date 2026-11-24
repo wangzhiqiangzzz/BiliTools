@@ -135,7 +135,7 @@ QLabel#PageTitle {{ {bold_ff}font-size: 22px; }}
 QLabel#NameBig {{ {bold_ff}font-size: 18px; }}
 QLabel#SectionTitle {{ {bold_ff}font-size: 16px; }}
 
-QWidget#HomePage {{ background-color: {p['panel_bg']}; }}
+QWidget#HomePage, QWidget#MySpacePage {{ background-color: {p['panel_bg']}; }}
 QLabel#HomeBrand {{ {bold_ff}font-size: 52px; color: {p['accent']}; }}
 QLabel#HomeEntryText {{ color: {p['nav_active']}; font-size: 14px; }}
 

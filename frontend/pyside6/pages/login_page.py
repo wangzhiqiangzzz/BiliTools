@@ -110,6 +110,10 @@ class LoginPage(QWidget):
         self.status_label.setText(msg)
         if ok:
             app_signals.log_message.emit(LogCategory.SUCCESS, msg)
+            # 登录成功后自动回首页：头像随即显示新账号，无需用户手动切页。
+            # （_on_done 触发时 login_changed 可能还没广播，首页头像会在随后
+            #  的登录态信号到达时刷新，顺序不影响最终状态。）
+            app_signals.goto_page.emit("home")
         else:
             app_signals.log_message.emit(LogCategory.WARN, f"登录未完成：{msg}")
 

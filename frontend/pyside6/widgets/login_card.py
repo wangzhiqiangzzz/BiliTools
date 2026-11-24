@@ -16,6 +16,18 @@ logger = logging.getLogger(__name__)
 FACE_CACHE_DIR = ASSETS_DIR / "cache"
 
 
+class _ClickableAvatar(QLabel):
+    """可点击头像：点击发出 clicked 信号（与 downkyicore 的头像按钮一致）。"""
+
+    from PySide6.QtCore import Signal
+    clicked = Signal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+
 class LoginCard(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,9 +43,13 @@ class LoginCard(QWidget):
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(10)
 
-        self.avatar = QLabel()
+        self.avatar = _ClickableAvatar()
         self.avatar.setFixedSize(60, 60)
         self.avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avatar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.avatar.setToolTip("我的空间")
+        self._user = None
+        self.avatar.clicked.connect(self._on_avatar_clicked)
         self.name_label = QLabel("未登录")
         self.name_label.setObjectName("NameBig")  # 字体由 theme QSS 控制（粗体、随缩放）
         self.mid_label = QLabel("请前往「登录」页扫码")
@@ -73,7 +89,15 @@ class LoginCard(QWidget):
     def refresh(self):
         query_login_async(lambda user: app_signals.login_changed.emit(user))
 
+    def _on_avatar_clicked(self):
+        """点头像：未登录去登录页，已登录去个人中心页。"""
+        if self._user is not None and getattr(self._user, "is_login", False):
+            app_signals.goto_page.emit("myspace")
+        else:
+            app_signals.goto_page.emit("login")
+
     def _render(self, user):
+        self._user = user
         if user is None or not getattr(user, "is_login", False):
             self.name_label.setText("未登录")
             self.mid_label.setText("请前往「登录」页扫码")

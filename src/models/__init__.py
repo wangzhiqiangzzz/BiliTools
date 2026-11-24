@@ -33,6 +33,7 @@ from src.models.fav_model import FavInfo
 from src.models.live_model import DanmakuMessage, LiveSessionResult, RoomInfo
 from src.models.login_model import LoginUser
 from src.models.message_model import MessageExportResult
+from src.models.myspace_model import MySpaceProfile, MySpaceStats
 from src.models.video_model import (
     VideoAISummary,
     VideoAISummaryOutline,
@@ -77,6 +78,8 @@ __all__ = [
     "RoomInfo",
     "LoginUser",
     "MessageExportResult",
+    "MySpaceProfile",
+    "MySpaceStats",
     "VideoAISummary",
     "VideoAISummaryOutline",
     "VideoAISummaryOutlinePart",

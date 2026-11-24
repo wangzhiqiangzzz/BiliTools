@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 from frontend.pyside6.pages.download_page import DownloadPage
 from frontend.pyside6.pages.home_page import HomePage
 from frontend.pyside6.pages.login_page import LoginPage
+from frontend.pyside6.pages.myspace_page import MySpacePage
 from frontend.pyside6.pages.settings_page import SettingsPage
 from frontend.pyside6.signals import app_signals
 from frontend.pyside6.title_bar import TitleBar
@@ -12,7 +13,7 @@ from frontend.pyside6.workers.download_manager import DownloadManager
 
 
 class MainWindow(QWidget):
-    PAGE_INDEX = {"home": 0, "download": 1, "login": 2, "settings": 3}
+    PAGE_INDEX = {"home": 0, "download": 1, "login": 2, "settings": 3, "myspace": 4}
 
     def __init__(self, settings, theme_mgr, parent=None):
         super().__init__(parent)
@@ -38,16 +39,22 @@ class MainWindow(QWidget):
         self.download_page = DownloadPage(self.settings, self.manager)
         self.login_page = LoginPage()
         self.settings_page = SettingsPage(self.settings, self.theme_mgr)
+        self.myspace_page = MySpacePage()
         self.stack.addWidget(self.home_page)       # 0
         self.stack.addWidget(self.download_page)   # 1
         self.stack.addWidget(self.login_page)      # 2
         self.stack.addWidget(self.settings_page)   # 3
+        self.stack.addWidget(self.myspace_page)    # 4
 
         outer.addWidget(self.title_bar)
         outer.addWidget(self.stack, 1)
 
         # 首页搜索框只负责识别来源，实际预填交给下载页，不在这里发网络请求。
         self.home_page.prefill_requested.connect(self.download_page.panel.prefill)
+        app_signals.prefill_requested.connect(self.download_page.panel.prefill)
+        # 记住当前登录用户：点头像跳个人页时把手数据带过去
+        self._current_user = None
+        app_signals.login_changed.connect(self._on_login_changed)
 
         self.title_bar.minimize_requested.connect(self.showMinimized)
         self.title_bar.maximize_requested.connect(self._toggle_maximize)
@@ -70,10 +77,17 @@ class MainWindow(QWidget):
         else:
             self.showMaximized()
 
+    def _on_login_changed(self, user):
+        self._current_user = user
+
     def _goto_page(self, name):
         idx = self.PAGE_INDEX.get(name)
-        if idx is not None:
-            self.stack.setCurrentIndex(idx)
+        if idx is None:
+            return
+        # 进入个人页前把当前登录用户传过去，触发资料加载
+        if name == "myspace":
+            self.myspace_page.load(self._current_user)
+        self.stack.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         if self.manager.has_running():
