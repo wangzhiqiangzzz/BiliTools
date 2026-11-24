@@ -4,7 +4,7 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QPA_FONTDIR", "")
-ROOT = r"G:\Projects\py\BiliTools"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
 RESULT = os.path.join(ROOT, "output", "logs", "smoke_result.txt")
@@ -65,7 +65,7 @@ try:
     app_signals.goto_page.emit("login")
     app.processEvents()
     log("page after goto login:", win.stack.currentIndex())
-    win.nav_bar.set_current(2)
+    app_signals.goto_page.emit("settings")
     app.processEvents()
     log("page after nav settings:", win.stack.currentIndex())
 

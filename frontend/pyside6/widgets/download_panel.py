@@ -478,6 +478,14 @@ class DownloadPanel(QWidget):
             "desc": f"{labels[tab]}（解析链接中…）",
         }
 
+    def prefill(self, text: str, source: str) -> None:
+        """首页搜索框跳转后调用：切换来源页签并填入输入，不触发下载。"""
+        index = {"bv": 0, "fav": 1, "season": 2, "up": 3}.get(source, 0)
+        self.tabs.setCurrentIndex(index)
+        target = self._inputs[index]
+        target.setText(text)
+        target.setFocus()
+
     def _on_download(self):
         spec = self._build_spec()
         if spec is None:

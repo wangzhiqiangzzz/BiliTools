@@ -1,4 +1,4 @@
-"""导航栏：功能切换（下载 / 登录 / 设置）。运行中任务数已移到标题栏居中显示。"""
+"""导航栏：功能切换（首页 / 下载 / 登录 / 设置）。运行中任务数已移到标题栏居中显示。"""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QTabBar, QWidget
 
@@ -19,7 +19,7 @@ class NavBar(QWidget):
         self.tabbar = QTabBar()
         self.tabbar.setExpanding(True)
         self.tabbar.setDrawBase(False)
-        for name in ("下载", "登录", "设置"):
+        for name in ("首页", "下载", "登录", "设置"):
             self.tabbar.addTab(name)
         self.tabbar.currentChanged.connect(self.currentChanged)
 

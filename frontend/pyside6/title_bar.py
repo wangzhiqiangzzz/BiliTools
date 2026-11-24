@@ -42,6 +42,7 @@ class TitleBar(QWidget):
     maximize_requested = Signal()
     close_requested = Signal()
     theme_toggled = Signal()
+    home_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -54,7 +55,12 @@ class TitleBar(QWidget):
         lay.setContentsMargins(12, 0, 8, 0)
         lay.setSpacing(2)
 
-        self.title = QLabel(f"BiliTools V{__version__}")
+        # 首页入口：导航栏去掉后，作为从任意页面返回首页的通道。
+        self.btn_home = self._btn("", "返回首页")
+        self.btn_home.setObjectName("TitleBtnHome")
+        lay.addWidget(self.btn_home)
+
+        self.title = QLabel(f"b站工具助手 V{__version__}")
         self.title.setObjectName("AppTitle")  # 字体由 theme QSS 控制（粗体、随缩放）
         lay.addWidget(self.title)
         lay.addStretch(1)
@@ -76,6 +82,7 @@ class TitleBar(QWidget):
         for b in (self.btn_theme, self.btn_min, self.btn_max, self.btn_close):
             lay.addWidget(b)
 
+        self.btn_home.clicked.connect(self.home_requested)
         self.btn_theme.clicked.connect(self.theme_toggled)
         self.btn_min.clicked.connect(self.minimize_requested)
         self.btn_max.clicked.connect(self.maximize_requested)
@@ -120,6 +127,7 @@ class TitleBar(QWidget):
 
     def _apply_theme_icons(self):
         """按当前主题刷新图标：窗口按钮换前景色，主题按钮在 月亮/太阳 间切换。"""
+        self._set_icon(self.btn_home, "home", "⌂")
         self._set_icon(self.btn_theme, _THEME_ICON[current_theme()], "🌙")
         self._set_icon(self.btn_min, "minimize", "—")
         self._set_icon(self.btn_max, "maximize", "□")

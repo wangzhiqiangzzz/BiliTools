@@ -2,8 +2,8 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
-from frontend.pyside6.nav_bar import NavBar
 from frontend.pyside6.pages.download_page import DownloadPage
+from frontend.pyside6.pages.home_page import HomePage
 from frontend.pyside6.pages.login_page import LoginPage
 from frontend.pyside6.pages.settings_page import SettingsPage
 from frontend.pyside6.signals import app_signals
@@ -12,7 +12,7 @@ from frontend.pyside6.workers.download_manager import DownloadManager
 
 
 class MainWindow(QWidget):
-    PAGE_INDEX = {"download": 0, "login": 1, "settings": 2}
+    PAGE_INDEX = {"home": 0, "download": 1, "login": 2, "settings": 3}
 
     def __init__(self, settings, theme_mgr, parent=None):
         super().__init__(parent)
@@ -22,7 +22,7 @@ class MainWindow(QWidget):
         self._build()
 
     def _build(self):
-        self.setWindowTitle("BiliTools")
+        self.setWindowTitle("b站工具助手")
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.resize(1100, 700)
         self.setMinimumSize(980, 640)
@@ -32,25 +32,28 @@ class MainWindow(QWidget):
         outer.setSpacing(0)
 
         self.title_bar = TitleBar(self)
-        self.nav_bar = NavBar()
 
         self.stack = QStackedWidget()
+        self.home_page = HomePage()
         self.download_page = DownloadPage(self.settings, self.manager)
         self.login_page = LoginPage()
         self.settings_page = SettingsPage(self.settings, self.theme_mgr)
-        self.stack.addWidget(self.download_page)   # 0
-        self.stack.addWidget(self.login_page)      # 1
-        self.stack.addWidget(self.settings_page)   # 2
+        self.stack.addWidget(self.home_page)       # 0
+        self.stack.addWidget(self.download_page)   # 1
+        self.stack.addWidget(self.login_page)      # 2
+        self.stack.addWidget(self.settings_page)   # 3
 
         outer.addWidget(self.title_bar)
-        outer.addWidget(self.nav_bar)
         outer.addWidget(self.stack, 1)
+
+        # 首页搜索框只负责识别来源，实际预填交给下载页，不在这里发网络请求。
+        self.home_page.prefill_requested.connect(self.download_page.panel.prefill)
 
         self.title_bar.minimize_requested.connect(self.showMinimized)
         self.title_bar.maximize_requested.connect(self._toggle_maximize)
         self.title_bar.close_requested.connect(self.close)
         self.title_bar.theme_toggled.connect(self._toggle_theme)
-        self.nav_bar.currentChanged.connect(self.stack.setCurrentIndex)
+        self.title_bar.home_requested.connect(lambda: self._goto_page("home"))
         self.manager.count_changed.connect(self.title_bar.set_task_count)
 
         app_signals.goto_page.connect(self._goto_page)
@@ -70,13 +73,12 @@ class MainWindow(QWidget):
     def _goto_page(self, name):
         idx = self.PAGE_INDEX.get(name)
         if idx is not None:
-            self.nav_bar.set_current(idx)
             self.stack.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         if self.manager.has_running():
             ans = QMessageBox.question(
-                self, "退出 BiliTools", "有下载任务正在运行，确定要退出吗？"
+                self, "退出 b站工具助手", "有下载任务正在运行，确定要退出吗？"
             )
             if ans != QMessageBox.StandardButton.Yes:
                 event.ignore()

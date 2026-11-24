@@ -135,6 +135,26 @@ QLabel#PageTitle {{ {bold_ff}font-size: 22px; }}
 QLabel#NameBig {{ {bold_ff}font-size: 18px; }}
 QLabel#SectionTitle {{ {bold_ff}font-size: 16px; }}
 
+QWidget#HomePage {{ background-color: {p['panel_bg']}; }}
+QLabel#HomeBrand {{ {bold_ff}font-size: 52px; color: {p['accent']}; }}
+QLabel#HomeEntryText {{ color: {p['nav_active']}; font-size: 14px; }}
+
+QWidget#HomeSearchBox {{
+    background-color: {p['input_bg']}; border: 2px solid {p['accent']};
+    border-radius: 26px;
+}}
+QWidget#HomeSearchBox:hover {{ border-color: {p['accent_hover']}; }}
+QLineEdit#HomeSearch {{ background: transparent; border: none; font-size: 16px; padding: 0; }}
+
+QPushButton#HomeSearchBtn {{ background: transparent; border: none; }}
+QPushButton#HomeEntryIcon {{
+    background-color: {p['btn_bg']}; border: none; border-radius: 34px;
+}}
+QPushButton#HomeEntryIcon:hover {{ background-color: {p['btn_hover']}; }}
+QPushButton#HomeEntryIcon:pressed {{ background-color: {p['btn_pressed']}; }}
+QPushButton#HomeLogin {{ background: transparent; border: none; color: {p['nav_active']}; }}
+QPushButton#HomeLogin:hover {{ color: {p['accent_hover']}; }}
+
 QPushButton {{
     background-color: {p['btn_bg']}; border: 1px solid {p['btn_border']};
     border-radius: 6px; padding: 5px 14px; color: {p['btn_text']};
