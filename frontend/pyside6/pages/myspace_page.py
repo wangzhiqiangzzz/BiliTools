@@ -166,8 +166,14 @@ class MySpacePage(QWidget):
             ("moral", "信誉"), ("silence", "禁言状态"),
         ):
             row = QHBoxLayout()
-            label = QLabel(text)
-            label.setObjectName("Dim")
+            # 关注/粉丝做成可点击按钮，点开对应列表页（复刻 downkyicore 的 StatusListCommand）
+            if key in ("following", "follower"):
+                label = QPushButton(text)
+                label.setObjectName("NavItem")
+                label.clicked.connect(lambda _=False, k=key: self._open_friends(k))
+            else:
+                label = QLabel(text)
+                label.setObjectName("Dim")
             value = QLabel("--")
             value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             row.addWidget(label)
@@ -274,22 +280,23 @@ class MySpacePage(QWidget):
 
     # ---- 入口 ----
 
-    def _goto_download_source(self, source: str) -> None:
-        """入口卡片统一跳到下载页并切换来源页签。"""
-        app_signals.goto_page.emit("download")
-        app_signals.prefill_requested.emit("", source)
+    def _open_friends(self, key: str):
+        """关注/粉丝：跳到好友页，由 MainWindow 带上当前 mid。"""
+        # 好友页默认展示关注；粉丝通过参数指定（MainWindow 读取这个临时标记）
+        self._friends_tab = "follower" if key == "follower" else "following"
+        app_signals.goto_page.emit("friends")
 
     def _open_favorites(self):
-        self._goto_download_source("fav")
+        app_signals.goto_page.emit("favorites")
 
     def _open_bangumi(self):
-        app_signals.log_message.emit(LogCategory.NORMAL, "追番列表暂未接入 GUI，可用 SDK 查看")
+        app_signals.goto_page.emit("bangumi")
 
     def _open_to_view(self):
-        app_signals.log_message.emit(LogCategory.NORMAL, "稍后再看暂未接入 GUI")
+        app_signals.goto_page.emit("watch_later")
 
     def _open_history(self):
-        app_signals.log_message.emit(LogCategory.NORMAL, "历史记录暂未接入 GUI，可用 examples/history.py")
+        app_signals.goto_page.emit("history")
 
     def _open_dynamics(self):
         from PySide6.QtGui import QDesktopServices

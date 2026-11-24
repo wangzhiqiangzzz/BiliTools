@@ -49,7 +49,8 @@ class MySpaceService:
         if not mid:
             return ""
         try:
-            params = get_wbi({"mid": mid})
+            params = {"mid": mid}
+            get_wbi(params)  # 原地追加 wts/w_rid；get_wbi 返回的是 (wts, w_rid)，不是 params
             data = self.session.get(UserUrls.ACC_INFO_WBI, params=params)
             # top_photo 在 wbi 接口里；card 接口无此字段
             return data.get("top_photo", "") or ""

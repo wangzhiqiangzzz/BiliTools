@@ -1,6 +1,7 @@
-"""头像加载工具：网络头像 + 磁盘缓存 + 圆形裁剪 + 默认占位。
+"""图片加载工具：网络图片 + 磁盘缓存 + 圆形/矩形裁剪 + 默认占位。
 
-供首页头像按钮、下载页登录卡片、个人中心页共用。
+头像（圆形）供首页头像按钮、下载页登录卡片、个人中心页共用；
+封面（矩形）供视频网格卡片使用。
 加载在网络请求的 reply 线程完成信号里回调（Qt 自动排回主线程），不阻塞 UI。
 """
 import hashlib
@@ -39,6 +40,22 @@ def round_pixmap(pm: QPixmap, size: int) -> QPixmap:
     p.drawPixmap((size - scaled.width()) // 2, (size - scaled.height()) // 2, scaled)
     p.end()
     return out
+
+
+def cover_pixmap(pm: QPixmap, width: int, height: int) -> QPixmap:
+    """把图片按矩形裁剪缩放（保持比例填满，多余部分裁掉），用于视频封面。"""
+    scaled = pm.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                       Qt.TransformationMode.SmoothTransformation)
+    x = (scaled.width() - width) // 2
+    y = (scaled.height() - height) // 2
+    return scaled.copy(x, y, width, height)
+
+
+def cover_placeholder(width: int, height: int) -> QPixmap:
+    """默认灰色矩形封面占位。"""
+    pm = QPixmap(width, height)
+    pm.fill(_PLACEHOLDER)
+    return pm
 
 
 def placeholder(size: int) -> QPixmap:
@@ -83,22 +100,47 @@ class AvatarLoader:
         except OSError:
             pass
         reply = self._net.get(QNetworkRequest(QUrl(url)))
-        self._pending[reply] = (size, callback, cache)
+        self._pending[reply] = ("round", size, callback, cache)
+
+    def load_cover(self, url: str, width: int, height: int, callback) -> None:
+        """加载矩形封面（不裁剪成圆）；优先读缓存，失败回调灰色占位。"""
+        if not url:
+            callback(cover_placeholder(width, height))
+            return
+        cache = _cache_path(url)
+        if cache.exists():
+            pm = QPixmap(str(cache))
+            if not pm.isNull():
+                callback(cover_pixmap(pm, width, height))
+                return
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        reply = self._net.get(QNetworkRequest(QUrl(url)))
+        self._pending[reply] = ("cover", (width, height), callback, cache)
 
     def _on_finished(self, reply) -> None:
         item = self._pending.pop(reply, None)
         if item is None:
             return
-        size, callback, cache = item
+        mode, spec, callback, cache = item
         try:
             data = reply.readAll()
             img = QImage.fromData(data)
             if img.isNull():
-                raise ValueError("头像数据不是有效图片")
+                raise ValueError("图片数据不是有效图片")
             img.save(str(cache), "PNG")
-            callback(round_pixmap(QPixmap.fromImage(img), size))
+            pm = QPixmap.fromImage(img)
+            if mode == "cover":
+                callback(cover_pixmap(pm, spec[0], spec[1]))
+            else:
+                callback(round_pixmap(pm, spec))
         except Exception as e:
-            logger.warning("[AvatarLoader] 头像加载失败：%s", e)
-            callback(placeholder(size))
+            logger.warning("[AvatarLoader] 图片加载失败：%s", e)
+            if mode == "cover":
+                callback(cover_placeholder(spec[0], spec[1]))
+            else:
+                callback(placeholder(spec))
         finally:
             reply.deleteLater()

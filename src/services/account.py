@@ -342,6 +342,8 @@ class AccountManager:
         :return: 当前账号；失败时返回 None
         """
         try:
+            if "SESSDATA=" not in (set_cookie or ""):
+                raise ValueError("登录响应缺少 SESSDATA，拒绝写入空凭证")
             cookies = BiliCookies(cookie=set_cookie)
             mid = cookies.mid if cookies.mid is not None else self._resolve_mid_online(set_cookie)
             if mid is None or int(mid) <= 0:

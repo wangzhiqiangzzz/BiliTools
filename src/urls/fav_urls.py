@@ -11,6 +11,10 @@ class FavUrls:
 
     RESOURCE_IDS = f"{API_BASE}/x/v3/fav/resource/ids"  # 获取收藏夹内视频（by media_id，一次性返回全部 id）
     FOLDER_INFO = f"{API_BASE}/x/v3/fav/folder/info"  # 收藏夹详情（名称/数量）
+    FOLDER_LIST = f"{API_BASE}/x/v3/fav/folder/created/list"  # 我创建的收藏夹列表（up_mid/pn/ps）
+    RESOURCE_LIST = f"{API_BASE}/x/v3/fav/resource/list"  # 收藏夹内视频明细（media_id/pn/ps）
+    WATCH_LATER = f"{API_BASE}/x/v2/fav/video/favoured"  # 稍后再看列表
+    BANGUMI_FOLLOW = f"{API_BASE}/x/space/bangumi/follow/list"  # 追番/追剧列表（vmid/type/pn/ps）
 
     @staticmethod
     def fav_page(uid: int, fid: int) -> str:

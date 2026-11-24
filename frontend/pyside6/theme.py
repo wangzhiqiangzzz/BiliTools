@@ -139,6 +139,11 @@ QWidget#HomePage, QWidget#MySpacePage {{ background-color: {p['panel_bg']}; }}
 QLabel#HomeBrand {{ {bold_ff}font-size: 52px; color: {p['accent']}; }}
 QLabel#HomeEntryText {{ color: {p['nav_active']}; font-size: 14px; }}
 
+QWidget#VideoCard {{
+    background-color: {p['card_bg']}; border: 1px solid {p['border']}; border-radius: 8px;
+}}
+QWidget#VideoCard:hover {{ border-color: {p['accent']}; }}
+
 QWidget#HomeSearchBox {{
     background-color: {p['input_bg']}; border: 2px solid {p['accent']};
     border-radius: 26px;

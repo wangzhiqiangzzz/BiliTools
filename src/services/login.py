@@ -113,7 +113,32 @@ class LoginService:
         :return: (状态码, set-cookie 原始字符串)。登录成功时 set-cookie 非空
         """
         code, resp = self._poll_once(qrcode_key)
-        return code, resp.headers.get("set-cookie", "") or None
+        return code, self._collect_set_cookie(resp) or None
+
+    @staticmethod
+    def _collect_set_cookie(resp) -> str:
+        """合并响应中所有 Set-Cookie 头。
+
+        requests 的 ``headers.get`` 只返回第一个 Set-Cookie（常是 buvid3），
+        真正的登录凭证 SESSDATA/bili_jct 在后续头里；必须从底层 raw.headers
+        取全部并合并，否则扫码登录会保存出空 cookie 文件。
+        """
+        raw = getattr(resp, "raw", None)
+        headers = getattr(raw, "headers", None)
+        values = []
+        getlist = getattr(headers, "getlist", None)
+        if callable(getlist):
+            values = list(getlist("Set-Cookie") or [])
+        if not values:
+            single = resp.headers.get("set-cookie", "")
+            values = [single] if single else []
+        # 每个 Set-Cookie 只保留 key=value 部分，去掉 Path/Domain/Expires 等属性
+        parts = []
+        for value in values:
+            head = value.split(";", 1)[0].strip()
+            if "=" in head and head not in parts:
+                parts.append(head)
+        return "; ".join(parts)
 
     def _poll_once(self, qrcode_key: str):
         """轮询一次并返回 (状态码, 响应)。登录成功时响应头含 set-cookie。"""
@@ -165,7 +190,7 @@ class LoginService:
             if code == 0:
                 # 登录成功：响应头携带 set-cookie；保存后刷新 BiliCookies 缓存，
                 # 后续新建 BiliSession 才能立即把新凭证带到服务层。
-                set_cookie = resp.headers.get("set-cookie", "")
+                set_cookie = self._collect_set_cookie(resp)
                 if not set_cookie:
                     logger.warning("[LoginService] 登录成功但未获取到 set-cookie，请手动检查 cookie 文件。")
                     return True

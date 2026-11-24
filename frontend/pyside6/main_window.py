@@ -3,17 +3,24 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from frontend.pyside6.pages.download_page import DownloadPage
+from frontend.pyside6.pages.friends_page import FriendsPage
 from frontend.pyside6.pages.home_page import HomePage
 from frontend.pyside6.pages.login_page import LoginPage
+from frontend.pyside6.pages.media_list_page import MediaListPage
 from frontend.pyside6.pages.myspace_page import MySpacePage
 from frontend.pyside6.pages.settings_page import SettingsPage
+from frontend.pyside6.pages.user_space_page import UserSpacePage
 from frontend.pyside6.signals import app_signals
 from frontend.pyside6.title_bar import TitleBar
 from frontend.pyside6.workers.download_manager import DownloadManager
 
 
 class MainWindow(QWidget):
-    PAGE_INDEX = {"home": 0, "download": 1, "login": 2, "settings": 3, "myspace": 4}
+    PAGE_INDEX = {
+        "home": 0, "download": 1, "login": 2, "settings": 3, "myspace": 4,
+        "friends": 5, "user_space": 6, "favorites": 7, "bangumi": 8,
+        "watch_later": 9, "history": 10,
+    }
 
     def __init__(self, settings, theme_mgr, parent=None):
         super().__init__(parent)
@@ -40,11 +47,23 @@ class MainWindow(QWidget):
         self.login_page = LoginPage()
         self.settings_page = SettingsPage(self.settings, self.theme_mgr)
         self.myspace_page = MySpacePage()
-        self.stack.addWidget(self.home_page)       # 0
-        self.stack.addWidget(self.download_page)   # 1
-        self.stack.addWidget(self.login_page)      # 2
-        self.stack.addWidget(self.settings_page)   # 3
-        self.stack.addWidget(self.myspace_page)    # 4
+        self.friends_page = FriendsPage()
+        self.user_space_page = UserSpacePage()
+        self.favorites_page = MediaListPage("favorites")
+        self.bangumi_page = MediaListPage("bangumi")
+        self.watch_later_page = MediaListPage("watch_later")
+        self.history_page = MediaListPage("history")
+        self.stack.addWidget(self.home_page)          # 0
+        self.stack.addWidget(self.download_page)      # 1
+        self.stack.addWidget(self.login_page)         # 2
+        self.stack.addWidget(self.settings_page)      # 3
+        self.stack.addWidget(self.myspace_page)       # 4
+        self.stack.addWidget(self.friends_page)       # 5
+        self.stack.addWidget(self.user_space_page)    # 6
+        self.stack.addWidget(self.favorites_page)     # 7
+        self.stack.addWidget(self.bangumi_page)       # 8
+        self.stack.addWidget(self.watch_later_page)   # 9
+        self.stack.addWidget(self.history_page)       # 10
 
         outer.addWidget(self.title_bar)
         outer.addWidget(self.stack, 1)
@@ -55,6 +74,9 @@ class MainWindow(QWidget):
         # 记住当前登录用户：点头像跳个人页时把手数据带过去
         self._current_user = None
         app_signals.login_changed.connect(self._on_login_changed)
+        # 点击博主 / 视频的跨页跳转
+        app_signals.user_space_requested.connect(self._open_user_space)
+        app_signals.video_detail_requested.connect(self._open_video_detail)
 
         self.title_bar.minimize_requested.connect(self.showMinimized)
         self.title_bar.maximize_requested.connect(self._toggle_maximize)
@@ -80,13 +102,40 @@ class MainWindow(QWidget):
     def _on_login_changed(self, user):
         self._current_user = user
 
+    @property
+    def _current_mid(self) -> int:
+        user = self._current_user
+        return int(getattr(user, "mid", 0) or 0) if user and getattr(user, "is_login", False) else 0
+
+    def _open_user_space(self, mid: int):
+        self.user_space_page.load(mid)
+        self.stack.setCurrentIndex(self.PAGE_INDEX["user_space"])
+
+    def _open_video_detail(self, bvid: str):
+        """视频详情：复用下载页预填（完整详情页尚未接入 GUI）。"""
+        app_signals.log_message.emit(0, f"打开视频：{bvid}（已填入下载页）")
+        self.download_page.panel.prefill(bvid, "bv")
+        self.stack.setCurrentIndex(self.PAGE_INDEX["download"])
+
     def _goto_page(self, name):
         idx = self.PAGE_INDEX.get(name)
         if idx is None:
             return
-        # 进入个人页前把当前登录用户传过去，触发资料加载
+        mid = self._current_mid
+        # 进入各页前带上当前用户 mid，触发对应加载
         if name == "myspace":
             self.myspace_page.load(self._current_user)
+        elif name == "friends":
+            tab = getattr(self.myspace_page, "_friends_tab", "following")
+            self.friends_page.load(mid, tab)
+        elif name == "favorites":
+            self.favorites_page.load(mid)
+        elif name == "bangumi":
+            self.bangumi_page.load(mid)
+        elif name == "watch_later":
+            self.watch_later_page.load(mid)
+        elif name == "history":
+            self.history_page.load(mid)
         self.stack.setCurrentIndex(idx)
 
     def closeEvent(self, event):

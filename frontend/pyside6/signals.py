@@ -21,6 +21,8 @@ class AppSignals(QObject):
     login_changed = Signal(object)       # LoginUser | None（未登录/获取失败）
     goto_page = Signal(str)              # 'home' | 'download' | 'login' | 'settings' | 'myspace'
     prefill_requested = Signal(str, str)  # (原文, source)：跳下载页后预填输入
+    user_space_requested = Signal(int)    # mid：打开某博主的个人空间页
+    video_detail_requested = Signal(str)  # bvid：打开视频详情页
     theme_changed = Signal(str)          # 'light' | 'dark'
     zoom_changed = Signal(float)         # 全局界面缩放系数
     save_dir_changed = Signal(str)       # 下载/设置页共享的保存目录

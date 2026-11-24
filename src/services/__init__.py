@@ -34,6 +34,7 @@ from src.services.message import MessageService
 from src.services.myspace import MySpaceService
 from src.services.rank import RankService
 from src.services.reply import ReplyService
+from src.services.social import SocialService
 from src.services.tts import TtsService
 from src.services.user import ContractService, UserService
 from src.services.video import VideoService
@@ -55,6 +56,7 @@ __all__ = [
     "MySpaceService",
     "RankService",
     "ReplyService",
+    "SocialService",
     "ContractService",
     "UserService",
     "VideoService",
