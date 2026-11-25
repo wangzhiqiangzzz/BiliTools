@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from src.models import MediaItem, UserInfo
 from src.services.social import SocialService
+from src.services.archive import ArchiveService
 from src.services.user import UserService
 from src.api.auth import get_wbi
 from src.urls.user_urls import UserUrls
@@ -84,6 +85,32 @@ class _VideoCard(QWidget):
         self.mousePressEvent = lambda e: on_click(media) if e.button() == Qt.MouseButton.LeftButton else None
 
 
+class _ArchiveCard(QWidget):
+    """合集卡片：封面 + 标题 + 视频数量。点击按 season_id 下载整个合集。"""
+
+    def __init__(self, title: str, cover: str, total: int, loaded: int,
+                 loader: AvatarLoader, on_click, parent=None):
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setObjectName("VideoCard")
+        v = QVBoxLayout(self)
+        v.setContentsMargins(4, 4, 4, 4)
+        v.setSpacing(4)
+        self.cover = QLabel()
+        self.cover.setFixedSize(_COVER_W, _COVER_H)
+        self.cover.setPixmap(cover_placeholder(_COVER_W, _COVER_H))
+        loader.load_cover(cover, _COVER_W, _COVER_H, self.cover.setPixmap)
+        v.addWidget(self.cover)
+        count = QLabel(f"共 {total} 个视频")
+        count.setObjectName("Dim")
+        v.addWidget(count)
+        name = QLabel(title)
+        name.setWordWrap(True)
+        name.setFixedHeight(36)
+        v.addWidget(name)
+        self.mousePressEvent = lambda e: on_click() if e.button() == Qt.MouseButton.LeftButton else None
+
+
 class UserSpacePage(QWidget):
     """博主空间页（投稿视频）。"""
 
@@ -92,6 +119,7 @@ class UserSpacePage(QWidget):
         self.setObjectName("MySpacePage")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._service = SocialService()
+        self._archive = ArchiveService()
         self._loader = AvatarLoader(self)
         self._mid = 0
         self._pn = 1
@@ -99,6 +127,7 @@ class UserSpacePage(QWidget):
         self._worker = None
         self._following = False
         self._order = "pubdate"  # pubdate / click / stow
+        self._view = "videos"  # videos / archives / articles / audio
         self._build()
 
     PS = 12  # 每行 4 个 × 3 行
@@ -148,21 +177,37 @@ class UserSpacePage(QWidget):
         cv.addLayout(info, 1)
         outer.addWidget(card)
 
-        # 主体：左侧分类 + 右侧视频网格
+        # 顶部导航：投稿 / 合集和系列（参照 B 站空间页）
+        tabs = QHBoxLayout()
+        tabs.setSpacing(6)
+        self.tab_buttons = {}
+        for key, text in (("videos", "投稿"), ("archives", "合集和系列")):
+            btn = QPushButton(text)
+            btn.setObjectName("NavItem")
+            btn.setCheckable(True)
+            btn.setChecked(key == "videos")
+            btn.clicked.connect(lambda _=False, k=key: self._switch_view(k))
+            tabs.addWidget(btn)
+            self.tab_buttons[key] = btn
+        tabs.addStretch(1)
+        outer.addLayout(tabs)
+
+        # 主体：左侧分类 + 右侧内容
         body = QHBoxLayout()
         body.setSpacing(12)
 
         left = QVBoxLayout()
-        self.category = QListWidget()
-        self.category.setFixedWidth(120)
-        for text in ("视频", "图文", "音频"):
-            item = QListWidgetItem(text)
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
-            self.category.addItem(item)
-        self.category.setCurrentRow(0)
-        left.addWidget(self.category)
+        self.category_buttons = {}
+        for key, text in (("videos", "视频"), ("articles", "图文"), ("audio", "音频")):
+            btn = QPushButton(text)
+            btn.setObjectName("NavItem")
+            btn.setCheckable(True)
+            btn.setChecked(key == "videos")
+            btn.clicked.connect(lambda _=False, k=key: self._switch_category(k))
+            left.addWidget(btn)
+            self.category_buttons[key] = btn
         left.addStretch(1)
-        body.addLayout(left)
+        body.addLayout(left, 0)
 
         right = QVBoxLayout()
         right.setSpacing(8)
@@ -171,6 +216,7 @@ class UserSpacePage(QWidget):
         self.section_title.setObjectName("PageTitle")
         head.addWidget(self.section_title)
         head.addStretch(1)
+        self._order_buttons = []
         for text, order in (("最新发布", "pubdate"), ("最多播放", "click"), ("最多收藏", "stow")):
             btn = QPushButton(text)
             btn.setObjectName("NavItem")
@@ -179,6 +225,7 @@ class UserSpacePage(QWidget):
             btn.clicked.connect(lambda _=False, o=order: self._set_order(o))
             head.addWidget(btn)
             setattr(self, f"_order_btn_{order}", btn)
+            self._order_buttons.append(btn)
         right.addLayout(head)
 
         self.grid_host = QWidget()
@@ -206,12 +253,50 @@ class UserSpacePage(QWidget):
         self._mid = int(mid)
         self._pn = 1
         self._name = ""
+        self._view = "videos"
+        self._category = "videos"
+        for key, btn in self.tab_buttons.items():
+            btn.setChecked(key == "videos")
+        for key, btn in self.category_buttons.items():
+            btn.setChecked(key == "videos")
         self.name.setText("加载中…")
         self.sign.setText("")
         self.stats.setText("")
         self.avatar.setPixmap(placeholder(56))
         self._load_profile()
-        self._load_videos()
+        self._load_content()
+
+    def _switch_view(self, view: str):
+        if view == self._view:
+            return
+        self._view = view
+        for key, btn in self.tab_buttons.items():
+            btn.setChecked(key == view)
+        self._pn = 1
+        self._load_content()
+
+    def _switch_category(self, category: str):
+        if category == self._category:
+            return
+        self._category = category
+        for key, btn in self.category_buttons.items():
+            btn.setChecked(key == category)
+        self._pn = 1
+        self._load_content()
+
+    def _load_content(self):
+        """按当前视图与分类加载内容。"""
+        show_order = self._view == "videos" and self._category == "videos"
+        for btn in self._order_buttons:
+            btn.setVisible(show_order)
+        if self._view == "archives":
+            self._load_archives()
+        elif self._category == "videos":
+            self._load_videos()
+        else:
+            self._clear_grid()
+            self.section_title.setText("图文 / 音频")
+            self._add_message(f"{'图文' if self._category == 'articles' else '音频'}列表暂未接入，可点击「在 B 站打开」查看")
 
     def _load_profile(self):
         loader = lambda: ([UserService().fetch_info(self._mid)],)
@@ -253,6 +338,48 @@ class UserSpacePage(QWidget):
         self._add_message("加载中…")
         self._worker = load_social(loader, self._on_videos, self._on_error)
 
+    def _load_archives(self):
+        """加载用户的合集/系列列表。"""
+        if self._worker and self._worker.isRunning():
+            self._worker.stop()
+            self._worker.wait(1000)
+
+        def loader():
+            seasons = self._archive._list_seasons(self._mid, self._pn, self.PS)
+            cards = []
+            for season in seasons:
+                meta = season.get("meta") or {}
+                archives = season.get("archives") or []
+                cover = meta.get("cover", "")
+                title = meta.get("name") or meta.get("title") or "未命名合集"
+                total = int(meta.get("total") or len(archives))
+                cards.append((title, cover, total, len(archives), meta.get("season_id", 0)))
+            return cards, len(cards), {}
+
+        self._clear_grid()
+        self._add_message("加载中…")
+        self._worker = load_social(loader, self._on_archives, self._on_error)
+
+    def _on_archives(self, items, total, extra):
+        self._clear_grid()
+        cols = 4
+        for idx, (title, cover, total_videos, loaded, season_id) in enumerate(items):
+            card = _ArchiveCard(title, cover, total_videos, loaded, self._loader,
+                                lambda sid=season_id: self._open_archive(sid))
+            self.grid.addWidget(card, idx // cols, idx % cols)
+        if not items:
+            self._add_message("该用户暂无合集/系列")
+        self.section_title.setText(f"合集和系列 · 共 {total} 个")
+        self.page_label.setText(f"第 {self._pn} 页")
+        self.btn_prev.setEnabled(self._pn > 1)
+        self.btn_next.setEnabled(self._pn * self.PS < total)
+
+    def _open_archive(self, season_id: int):
+        """点击合集：跳到下载页并按合集 sid 预填。"""
+        if season_id:
+            app_signals.prefill_requested.emit(str(season_id), "season")
+            app_signals.goto_page.emit("download")
+
     def _clear_grid(self):
         while self.grid.count():
             item = self.grid.takeAt(0)
@@ -281,7 +408,7 @@ class UserSpacePage(QWidget):
 
     def _turn_page(self, delta):
         self._pn = max(1, self._pn + delta)
-        self._load_videos()
+        self._load_content()
 
     def _open_video(self, media: MediaItem):
         if media.bvid:

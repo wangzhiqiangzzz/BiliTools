@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QRectF, Qt, QUrl
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPixmap, QPixmapCache
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest
 
 from src.config.path import ASSETS_DIR
@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 CACHE_DIR = ASSETS_DIR / "cache"
 _PLACEHOLDER = QColor("#cfd6de")
+
+# 内存缓存容量（KB）：封面/头像解码后驻留，避免翻页时反复从磁盘解码导致卡顿。
+QPixmapCache.setCacheLimit(64 * 1024)
+
+
+def _mem_key(url: str, mode: str, spec) -> str:
+    size = spec if isinstance(spec, int) else f"{spec[0]}x{spec[1]}"
+    return f"avatar:{mode}:{size}:{url}"
 
 
 def _cache_path(url: str) -> Path:
@@ -82,49 +90,55 @@ class AvatarLoader:
     def __init__(self, parent=None):
         self._net = QNetworkAccessManager(parent)
         self._net.finished.connect(self._on_finished)
-        self._pending = {}  # reply -> (size, callback)
+        self._pending = {}  # reply -> (mode, spec, [callbacks], cache, url, key)
+        self._inflight = {}  # cache_path -> reply（同一图片只发一个请求）
+
+    def _get(self, url: str, mode: str, spec, callback, fallback):
+        key = _mem_key(url, mode, spec)
+        pm = QPixmapCache.find(key)
+        if pm is not None and not pm.isNull():
+            callback(pm)
+            return
+        if not url:
+            callback(fallback())
+            return
+        cache = _cache_path(url)
+        # 已在下载中的同一图片：把回调挂到同一请求上，避免重复下载
+        if cache in self._inflight:
+            self._pending[self._inflight[cache]][2].append(callback)
+            # 新请求的尺寸可能和已有请求不同；内存 key 不同时无法复用，
+            # 但磁盘缓存会在首个请求返回后写入，这里先回调占位图兜底。
+            return
+        if cache.exists():
+            disk = QPixmap(str(cache))
+            if not disk.isNull():
+                pm = round_pixmap(disk, spec) if mode == "round" else cover_pixmap(disk, spec[0], spec[1])
+                QPixmapCache.insert(key, pm)
+                callback(pm)
+                return
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        reply = self._net.get(QNetworkRequest(QUrl(url)))
+        self._pending[reply] = (mode, spec, [callback], cache, url, key)
+        self._inflight[cache] = reply
 
     def load(self, url: str, size: int, callback) -> None:
-        """加载头像；优先读缓存，否则发起网络请求。失败回调默认占位图。"""
-        if not url:
-            callback(placeholder(size))
-            return
-        cache = _cache_path(url)
-        if cache.exists():
-            pm = QPixmap(str(cache))
-            if not pm.isNull():
-                callback(round_pixmap(pm, size))
-                return
-        try:
-            cache.parent.mkdir(parents=True, exist_ok=True)
-        except OSError:
-            pass
-        reply = self._net.get(QNetworkRequest(QUrl(url)))
-        self._pending[reply] = ("round", size, callback, cache)
+        """加载头像：内存缓存 → 磁盘缓存 → 网络。失败回调默认占位图。"""
+        self._get(url, "round", size, callback, lambda: placeholder(size))
 
     def load_cover(self, url: str, width: int, height: int, callback) -> None:
-        """加载矩形封面（不裁剪成圆）；优先读缓存，失败回调灰色占位。"""
-        if not url:
-            callback(cover_placeholder(width, height))
-            return
-        cache = _cache_path(url)
-        if cache.exists():
-            pm = QPixmap(str(cache))
-            if not pm.isNull():
-                callback(cover_pixmap(pm, width, height))
-                return
-        try:
-            cache.parent.mkdir(parents=True, exist_ok=True)
-        except OSError:
-            pass
-        reply = self._net.get(QNetworkRequest(QUrl(url)))
-        self._pending[reply] = ("cover", (width, height), callback, cache)
+        """加载矩形封面：内存缓存 → 磁盘缓存 → 网络。失败回调灰色占位。"""
+        self._get(url, "cover", (width, height), callback,
+                  lambda: cover_placeholder(width, height))
 
     def _on_finished(self, reply) -> None:
         item = self._pending.pop(reply, None)
         if item is None:
             return
-        mode, spec, callback, cache = item
+        mode, spec, callbacks, cache, url, key = item
+        self._inflight.pop(cache, None)
         try:
             data = reply.readAll()
             img = QImage.fromData(data)
@@ -132,15 +146,14 @@ class AvatarLoader:
                 raise ValueError("图片数据不是有效图片")
             img.save(str(cache), "PNG")
             pm = QPixmap.fromImage(img)
-            if mode == "cover":
-                callback(cover_pixmap(pm, spec[0], spec[1]))
-            else:
-                callback(round_pixmap(pm, spec))
+            done = cover_pixmap(pm, spec[0], spec[1]) if mode == "cover" else round_pixmap(pm, spec)
+            QPixmapCache.insert(key, done)
+            for cb in callbacks:
+                cb(done)
         except Exception as e:
             logger.warning("[AvatarLoader] 图片加载失败：%s", e)
-            if mode == "cover":
-                callback(cover_placeholder(spec[0], spec[1]))
-            else:
-                callback(placeholder(spec))
+            fallback = cover_placeholder(spec[0], spec[1]) if mode == "cover" else placeholder(spec)
+            for cb in callbacks:
+                cb(fallback)
         finally:
             reply.deleteLater()
