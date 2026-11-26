@@ -53,6 +53,26 @@ class BiliSession:
         self.session = requests.Session()
         self.session.headers.update(self.cookie.to_headers(referer=referer))
 
+    def refresh_cookie(self) -> bool:
+        """重新读取当前生效账号的 cookie 并刷新请求头。
+
+        ``BiliSession`` 在构造时把 cookie 固化进 headers；应用内扫码登录或账号
+        切换后，已构造的 service 仍持有旧登录态。供长生命周期的 UI service 在
+        每次请求前调用，确保带上当前登录态。
+
+        :return: 是否成功刷新为有效登录态（SESSDATA 存在）。
+        """
+        path = str(get_cookie_path())
+        # 强制重读：扫码登录后 cookie 文件被覆盖，进程内缓存可能仍是旧值。
+        try:
+            cookies = BiliCookies.refresh(Path(path))
+        except FileNotFoundError:
+            cookies = BiliCookies()  # 未登录：以匿名会话继续，不打断展示
+        self.cookie_path = path
+        self.cookie = cookies
+        self.session.headers.update(cookies.to_headers(referer=self.referer))
+        return cookies.has_valid_session
+
     @staticmethod
     def _load_cookie(cookie_path: Optional[str]) -> "BiliCookies":
         """读取 cookie；本地无 cookie 文件时以匿名会话（空 cookie）代替，不抛异常。

@@ -1,4 +1,4 @@
-"""首页：品牌标识 + 统一搜索框 + 三个功能入口。
+"""首页：品牌标识 + 统一搜索框 + 四个功能入口。
 
 搜索框只做输入识别与页面跳转，不发网络请求、不触发下载；
 识别出的来源和原文通过 prefill_requested 交给下载页预填。
@@ -16,7 +16,7 @@ from frontend.pyside6.signals import LogCategory, app_signals
 from frontend.pyside6.theme import get_palette
 
 _SVG_DIR = ASSETS_DIR / "imgs" / "svg"
-_FALLBACK = {"search": "⌕", "settings": "⚙", "download": "⇩", "toolbox": "▣"}
+_FALLBACK = {"search": "⌕", "settings": "⚙", "download": "⇩", "toolbox": "▣", "schedule": "◷"}
 
 
 @lru_cache(maxsize=None)
@@ -43,7 +43,7 @@ def detect_source(text: str) -> str:
 
 
 class HomePage(QWidget):
-    """首页：搜索框跳转下载页，三个圆形入口分别通向设置/下载/工具箱。"""
+    """首页：搜索框跳转下载页，四个圆形入口分别通向设置/下载/工具箱/定时任务。"""
 
     prefill_requested = Signal(str, str)  # (原文, source)
 
@@ -120,6 +120,7 @@ class HomePage(QWidget):
             ("settings", "设置", "settings", lambda: app_signals.goto_page.emit("settings")),
             ("download", "下载管理", "download", lambda: app_signals.goto_page.emit("download")),
             ("toolbox", "工具箱", "toolbox", self._on_toolbox),
+            ("schedule", "定时任务", "schedule", self._on_schedule),
         ):
             item = QVBoxLayout()
             item.setSpacing(8)
@@ -153,6 +154,9 @@ class HomePage(QWidget):
 
     def _on_toolbox(self):
         QMessageBox.information(self, "工具箱", "工具箱功能开发中，敬请期待。")
+
+    def _on_schedule(self):
+        QMessageBox.information(self, "定时任务", "定时任务功能开发中，敬请期待。")
 
     def _on_account_clicked(self):
         """头像点击：未登录去登录页，已登录去个人中心页。"""

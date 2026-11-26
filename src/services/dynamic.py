@@ -132,6 +132,35 @@ class DynamicService:
         self.default_dir = Path(default_dir) if default_dir is not None else DYNAMIC_OUTPUT_DIR
         self.reply_service = ReplyService(session=self.session)
 
+    def fetch_user_dynamic_page(
+        self, mid: int, offset: str = "", *, feed_type: str = "all"
+    ) -> tuple[list[dict], str, bool]:
+        """拉一页用户空间动态（供 UI 列表用，不写快照、不阻塞等验证码）。
+
+        与 ``list_user_dynamics`` 的区别：后者为批量下载设计，会翻页到底、
+        读写快照并在 -352 时等待用户完成验证码；本方法只请求一页，
+        触发验证码时直接抛异常交给 UI 提示，避免卡死界面线程。
+
+        :return: (动态 item 列表, 下一页 offset, 是否还有更多)
+        """
+        from src.api.errors import BiliRiskError
+        from src.util.risk_gate import RiskGate
+
+        # 带上当前登录态：service 在 GUI 启动时构造，扫码登录/账号切换后其
+        # session 仍固化着旧 cookie。每次拉列表前重读当前账号，确保接口按登录
+        # 用户返回（充电专属动态等只对登录态可见的内容才不会被过滤掉）。
+        self.session.refresh_cookie()
+
+        gate = RiskGate()
+        data = self._fetch_feed_page(
+            int(mid), offset, gate=gate, risk_retries=1, page=1,
+            captcha_handler=None, captcha_wait=False, feed_type=feed_type,
+        )
+        items = list(data.get("items") or [])
+        has_more = bool(data.get("has_more", False))
+        next_offset = str(data.get("offset") or "")
+        return items, next_offset, has_more
+
     # ---- 阶段 1 · ID 解析 ----
 
     @staticmethod
@@ -713,6 +742,10 @@ class DynamicService:
             "host_mid": mid,
             "timezone_offset": -480,
             "features": DynamicUrls.DETAIL_FEATURES,
+            # 网页端 feed/space 会带 platform=web：服务端据此决定是否返回
+            # 充电专属（onlyfans）等动态。缺失时列表会少条目（实测同一时刻
+            # 无此参数 10 条、有此参数 13 条且含充电动态）。
+            "platform": "web",
         }
         if feed_type != "all":
             params["type"] = feed_type
